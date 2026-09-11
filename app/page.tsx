@@ -53,7 +53,9 @@ const guardar = async () => {
         </div>
       ))}
 
-      <button>Guardar cambios</button>
+      <button onClick={guardar}>
+  Guardar cambios
+</button>
     </main>
   );
 }
