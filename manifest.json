@@ -1,0 +1,12 @@
+{
+  "name": "H Barber Shop",
+  "short_name": "H Barber Shop",
+  "description": "Agenda de citas y control de caja para H Barber Shop",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0A0A",
+  "theme_color": "#0A0A0A",
+  "icons": [
+    { "src": "/icon.png", "sizes": "196x200", "type": "image/png", "purpose": "any" }
+  ]
+}
