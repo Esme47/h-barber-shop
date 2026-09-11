@@ -20,7 +20,9 @@ export default function Home() {
     ));
   };
 const guardar = async () => {
-  await supabase.from('barbers').upsert(barbero);
+  console.log(barbero, servicios);
+  alert("Cambios preparados");
+};
 
   for (const s of servicios) {
     await supabase.from('services').upsert(s);
