@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { sql } from "../lib/neon";
 export default function Home() {
   const [barbero, setBarbero] = useState({
     nombre: 'Harold',
