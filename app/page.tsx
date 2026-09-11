@@ -24,7 +24,6 @@ const guardar = async () => {
   alert("Cambios preparados");
 };
 
-return (
   return (
     <main style={{padding:20}}>
       <h1>H Barber Shop</h1>
