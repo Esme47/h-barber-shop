@@ -23,6 +23,8 @@ const guardar = async () => {
   console.log(barbero, servicios);
   alert("Cambios preparados");
 };
+  alert("Cambios preparados");
+};
 
   for (const s of servicios) {
     await supabase.from('services').upsert(s);
