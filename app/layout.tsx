@@ -1,13 +1,16 @@
-export const metadata = {
+import "./globals.css";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
   title: "H Barber Shop",
-  description: "Agenda de barbería",
+  description: "Agenda profesional de barbería",
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <html lang="es">
       <body>{children}</body>
