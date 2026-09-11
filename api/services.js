@@ -3,7 +3,6 @@ import { neon } from "@neondatabase/serverless";
 const sql = neon(process.env.DATABASE_URL);
 
 export default async function handler(req, res) {
-
   if (req.method === "GET") {
     const data = await sql`SELECT * FROM services ORDER BY id`;
     return res.status(200).json(data);
@@ -20,8 +19,8 @@ export default async function handler(req, res) {
       WHERE id=${id};
     `;
 
-    return res.status(200).json({ ok:true });
+    return res.status(200).json({ ok: true });
   }
 
-  res.status(405).end();
+  res.status(405).json({ error: "Método no permitido" });
 }
