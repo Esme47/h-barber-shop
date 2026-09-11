@@ -23,7 +23,6 @@ const guardar = async () => {
   console.log(barbero, servicios);
   alert("Cambios preparados");
 };
-
   return (
     <main style={{padding:20}}>
       <h1>H Barber Shop</h1>
