@@ -19,7 +19,15 @@ export default function Home() {
       s.id===id ? {...s,[campo]:valor} : s
     ));
   };
+const guardar = async () => {
+  await supabase.from('barbers').upsert(barbero);
 
+  for (const s of servicios) {
+    await supabase.from('services').upsert(s);
+  }
+
+  alert('Cambios guardados');
+};
   return (
     <main style={{padding:20}}>
       <h1>H Barber Shop</h1>
