@@ -338,8 +338,9 @@ function setTab(t){
 }
 
 function goToAgenda(){
+  // Vuelve a la pantalla publica de reserva de citas (NO al panel del barbero, que pide PIN).
   resetBooking();
-  setTab('admin');
+  setTab('book');
 }
 
 // ---------- BOOKING VIEW ----------
