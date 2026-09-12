@@ -111,11 +111,12 @@
   .status.cancelada{ background:#3A1717; color:#E28080; }
   .appt-client{ font-weight:700; font-size:13px; color:var(--silver); margin-top:4px; }
   .appt-serv{ font-size:11px; color:var(--muted); margin-top:1px; }
-  .appt-actions{ display:flex; gap:7px; margin-top:10px; }
-  .abtn{ flex:1; text-align:center; font-size:10.5px; font-weight:600; padding:7px 0; border-radius:8px; cursor:pointer; border:1px solid var(--line); background:var(--surface-2); color:var(--silver); }
+  .appt-actions{ display:flex; gap:7px; margin-top:10px; flex-wrap:wrap; }
+  .abtn{ flex:1; text-align:center; font-size:10.5px; font-weight:600; padding:7px 0; border-radius:8px; cursor:pointer; border:1px solid var(--line); background:var(--surface-2); color:var(--silver); min-width:78px; }
   .abtn.pay{ background:var(--green); border-color:var(--green); color:#fff; }
   .abtn.cancel{ color:#E28080; }
   .abtn.del{ color:var(--muted); }
+  .abtn.wa{ background:#25D366; border-color:#25D366; color:#06210f; }
   .empty{ text-align:center; padding:30px 10px; color:var(--muted); font-size:12.5px; }
   .totals{ position:sticky; bottom:0; background:#000; border-top:1px solid var(--line); border-radius:14px 14px 0 0; padding:14px 16px; display:flex; justify-content:space-between; margin:16px -16px 0; }
   .totals div{ font-size:9.5px; color:var(--muted); }
@@ -201,8 +202,8 @@
 
       <section>
         <div class="lbl">5. Tus datos</div>
-        <input type="text" id="cName" placeholder="Nombre completo">
-        <input type="tel" id="cPhone" placeholder="WhatsApp (ej. 300 000 0000)">
+        <input type="text" id="cName" placeholder="Nombre completo" autocomplete="off">
+        <input type="tel" id="cPhone" placeholder="WhatsApp (ej. 300 000 0000)" autocomplete="off">
       </section>
 
       <div class="summary" id="summaryBox" style="display:none;"></div>
@@ -213,9 +214,10 @@
     <div class="confirm-wrap" id="confirmWrap">
       <div class="okbadge"><div class="circ">✓</div><h2>Cita confirmada</h2></div>
       <div class="wa" id="waPreview"></div>
-      <div class="wa-note">Vista previa del recordatorio. Toca el botón verde para enviarlo ahora mismo por WhatsApp.</div>
-      <a class="cta" id="waSendBtn" href="#" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;background:#25D366;margin-top:14px;">Enviar por WhatsApp</a>
+      <div class="wa-note">Toca el botón verde para avisarle al barbero de esta nueva cita por WhatsApp.</div>
+      <a class="cta" id="waSendBtn" href="#" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;background:#25D366;margin-top:14px;">Avisar al barbero por WhatsApp</a>
       <button class="cta ghost" onclick="resetBooking()">Agendar otra cita</button>
+      <button class="cta ghost" onclick="goToAgenda()">Volver a la agenda</button>
     </div>
 
   </div>
@@ -235,7 +237,7 @@
       <div class="lbl">Barberos · protegido con PIN</div>
       <div id="mgmtBarbers"></div>
       <div class="mgmt-add">
-        <input type="text" id="newBarberName" placeholder="Nombre del nuevo barbero">
+        <input type="text" id="newBarberName" placeholder="Nombre del nuevo barbero" autocomplete="off">
         <button class="cta ghost" style="margin-top:0;" onclick="addBarber()">+ Agregar barbero</button>
       </div>
     </section>
@@ -244,9 +246,9 @@
       <div class="lbl">Servicios · protegido con PIN</div>
       <div id="mgmtServices"></div>
       <div class="mgmt-add">
-        <input type="text" id="newServiceName" placeholder="Nombre del servicio">
-        <input type="text" id="newServiceDesc" placeholder="Descripción corta (opcional)">
-        <input type="text" id="newServicePrice" placeholder="Precio (ej. 25000)" inputmode="numeric">
+        <input type="text" id="newServiceName" placeholder="Nombre del servicio" autocomplete="off">
+        <input type="text" id="newServiceDesc" placeholder="Descripción corta (opcional)" autocomplete="off">
+        <input type="text" id="newServicePrice" placeholder="Precio (ej. 25000)" inputmode="numeric" autocomplete="off">
         <button class="cta ghost" style="margin-top:0;" id="serviceSubmitBtn" onclick="submitService()">+ Agregar servicio</button>
         <div id="cancelServiceEdit" onclick="cancelEditService()" style="display:none;text-align:center;margin-top:10px;font-size:11px;color:var(--muted);cursor:pointer;text-decoration:underline;">Cancelar edición</div>
       </div>
@@ -257,15 +259,17 @@
 
 <script>
 const API = "/api/appointments";
+const BARBER_WHATSAPP = "573018992551"; // numero fijo del barbero para avisos de nueva cita
 
 let BARBERS = [];
 let SERVICES = [];
+let lastAppts = [];
 
 async function loadConfig(){
   try{
     const r = await fetch('/api/config');
     const data = await r.json();
-    BARBERS = (data.barbers||[]).map(b => ({ id:b.id, name:b.name, letter:(b.name||'?').charAt(0).toUpperCase() }));
+    BARBERS = (data.barbers||[]).map(b => ({ id:b.id, name:b.name, letter:(b.name||'?').charAt(0).toUpperCase(), photo:b.photo_url||'' }));
     SERVICES = (data.services||[]).map(s => ({ id:s.id, name:s.name, desc:s.description||'', price:Number(s.price) }));
   }catch(e){ BARBERS = []; SERVICES = []; }
 }
@@ -333,12 +337,17 @@ function setTab(t){
   if(t==='admin') renderAdmin();
 }
 
+function goToAgenda(){
+  resetBooking();
+  setTab('admin');
+}
+
 // ---------- BOOKING VIEW ----------
 function renderBarberPick(){
   const el = document.getElementById('barberPick');
   el.innerHTML = BARBERS.map(b => `
     <div class="pickcard ${state.barber===b.id?'sel':''}" onclick="pickBarber('${b.id}')">
-      <div class="av letter">${b.letter}</div>
+      ${b.photo ? `<img class="av" src="${b.photo}">` : `<div class="av letter">${b.letter}</div>`}
       <b>${b.name}</b><span>Barbero</span>
     </div>`).join('');
 }
@@ -431,12 +440,12 @@ async function confirmBooking(){
     <div class="bubble">Hola <b>${name}</b>, tienes una reserva en <b>H Barber Shop</b> el ${d.label.toLowerCase()} ${d.num} a las ${state.time} con ${b.name}.<br>Servicio: ${s.name} · ${money(s.price)}<span class="t">Ahora</span></div>
     <div class="bubble out">Confirmo asistencia<span class="t">Ahora ✓✓</span></div>`;
 
-  const waMessage = `Hola ${name}, tienes una reserva en H Barber Shop el ${d.label.toLowerCase()} ${d.num} a las ${state.time} con ${b.name}. Servicio: ${s.name} - ${money(s.price)}. ¡Te esperamos!`;
-  document.getElementById('waSendBtn').href = `https://wa.me/${toWhatsAppNumber(phone)}?text=${encodeURIComponent(waMessage)}`;
+  // El boton verde ahora avisa al NUMERO FIJO DEL BARBERO sobre la nueva cita (no al cliente).
+  const waMessage = `Nueva cita: ${name} (${phone}) reservó ${s.name} el ${d.label.toLowerCase()} ${d.num} a las ${state.time} con ${b.name}. Total: ${money(s.price)}.`;
+  document.getElementById('waSendBtn').href = `https://wa.me/${BARBER_WHATSAPP}?text=${encodeURIComponent(waMessage)}`;
 
-  // Best-effort: try the real WhatsApp Business API send too. If Meta credentials aren't
-  // configured yet (WHATSAPP_TOKEN / WHATSAPP_PHONE_ID), this silently no-ops; the manual
-  // "Enviar por WhatsApp" button above still works regardless.
+  // Best-effort: intenta tambien el envio real por la API de WhatsApp Business al CLIENTE.
+  // Si aun no estan configuradas WHATSAPP_TOKEN / WHATSAPP_PHONE_ID, esto no hace nada.
   fetch('/api/send-whatsapp', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ to: phone, clientName: name, barberName: b.name, dateLabel: `${d.label} ${d.num}`, time: state.time, service: s.name })
@@ -471,6 +480,7 @@ async function renderAdmin(){
 
   appts = appts.filter(a => adminFilter==='todos' || a.barber_id===adminFilter)
                .sort((a,b)=> a.appt_time.localeCompare(b.appt_time));
+  lastAppts = appts;
 
   const list = document.getElementById('adminList');
   if(appts.length===0){
@@ -485,6 +495,7 @@ async function renderAdmin(){
         <div class="appt-client">${a.client}</div>
         <div class="appt-serv">${a.service} · ${money(a.price)} · ${a.phone}</div>
         <div class="appt-actions">
+          <div class="abtn wa" onclick="sendConfirmationToClient('${a.id}')">WhatsApp al cliente</div>
           ${a.status!=='pagada' ? `<div class="abtn pay" onclick="setStatus('${a.id}','pagada')">Marcar pagada</div>` : ''}
           ${a.status!=='cancelada' ? `<div class="abtn cancel" onclick="setStatus('${a.id}','cancelada')">Cancelar</div>` : ''}
           <div class="abtn del" onclick="deleteAppt('${a.id}')">Eliminar</div>
@@ -498,6 +509,13 @@ async function renderAdmin(){
   document.getElementById('totComisiones').textContent = money(Math.round(ventas*COMMISSION_RATE));
 
   renderMgmt();
+}
+
+function sendConfirmationToClient(id){
+  const a = lastAppts.find(x => x.id === id);
+  if(!a) return;
+  const msg = `Hola ${a.client}, tu cita en H Barber Shop quedó confirmada para el ${a.date_label || a.appt_date} a las ${a.appt_time.slice(0,5)} con ${a.barber_name}. Servicio: ${a.service} · ${money(a.price)}. ¡Te esperamos!`;
+  window.open(`https://wa.me/${toWhatsAppNumber(a.phone)}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 async function renderMgmt(){
