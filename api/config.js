@@ -42,6 +42,10 @@ module.exports = async (req, res) => {
         await sql`UPDATE barbers SET active = NOT active WHERE id = ${id}`;
         return res.status(200).json({ ok: true });
       }
+      if (entity === 'barber' && action === 'edit') {
+        await sql`UPDATE barbers SET name = ${name} WHERE id = ${id}`;
+        return res.status(200).json({ ok: true });
+      }
 
       if (entity === 'service' && action === 'add') {
         const newId = slugify(id || name);
@@ -53,6 +57,10 @@ module.exports = async (req, res) => {
       }
       if (entity === 'service' && action === 'toggle') {
         await sql`UPDATE services SET active = NOT active WHERE id = ${id}`;
+        return res.status(200).json({ ok: true });
+      }
+      if (entity === 'service' && action === 'edit') {
+        await sql`UPDATE services SET name = ${name}, description = ${description || ''}, price = ${price} WHERE id = ${id}`;
         return res.status(200).json({ ok: true });
       }
 
