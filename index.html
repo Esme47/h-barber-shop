@@ -38,11 +38,18 @@
   .lbl{ font-family:'Inter'; font-weight:600; font-size:11.5px; letter-spacing:0.06em; text-transform:uppercase; color:var(--silver-2); margin-bottom:10px; }
   .cards2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .pickcard{
-    background:var(--surface); border:1.5px solid var(--line); border-radius:14px; padding:12px 10px; text-align:center; cursor:pointer;
+    background:var(--surface); border:1.5px solid var(--line); border-radius:14px; padding:14px 10px; text-align:center; cursor:pointer;
   }
   .pickcard.sel{ border-color:var(--red); background:var(--red-dim); }
-  .pickcard .av{ width:44px; height:44px; border-radius:50%; margin:0 auto 8px; object-fit:cover; display:block; }
-  .pickcard .av.letter{ display:flex; align-items:center; justify-content:center; font-family:'Cinzel',serif; font-weight:700; font-size:16px; color:#fff; background:var(--blue); }
+  .pickcard .av{
+    width:72px; height:72px; border-radius:18px; margin:0 auto 10px; object-fit:cover; display:block;
+    border:2px solid var(--gold); box-shadow:0 6px 18px rgba(0,0,0,0.55);
+  }
+  .pickcard .av.letter{
+    display:flex; align-items:center; justify-content:center; font-family:'Cinzel',serif; font-weight:700;
+    font-size:24px; color:#fff; background:var(--blue);
+  }
+  .pickcard.sel .av{ border-color:var(--red); }
   .pickcard b{ display:block; font-size:12.5px; color:var(--silver); }
   .pickcard span{ display:block; font-size:9.5px; color:var(--muted); margin-top:2px; }
   .servlist{ display:flex; flex-direction:column; gap:8px; }
@@ -250,7 +257,10 @@
         <input type="text" id="newServiceDesc" placeholder="Descripción corta (opcional)" autocomplete="off">
         <input type="text" id="newServicePrice" placeholder="Precio (ej. 25000)" inputmode="numeric" autocomplete="off">
         <button class="cta ghost" style="margin-top:0;" id="serviceSubmitBtn" onclick="submitService()">+ Agregar servicio</button>
-        <div id="cancelServiceEdit" onclick="cancelEditService()" style="display:none;text-align:center;margin-top:10px;font-size:11px;color:var(--muted);cursor:pointer;text-decoration:underline;">Cancelar edición</div>
+        <div style="display:flex; justify-content:center; gap:16px; margin-top:10px;">
+          <div id="cancelServiceEdit" onclick="cancelEditService()" style="display:none;font-size:11px;color:var(--muted);cursor:pointer;text-decoration:underline;">Cancelar edición</div>
+          <div id="deleteServiceBtn" onclick="deleteServiceEditing()" style="display:none;font-size:11px;color:#E28080;cursor:pointer;text-decoration:underline;">Eliminar servicio</div>
+        </div>
       </div>
     </section>
   </div>
@@ -574,6 +584,7 @@ function startEditService(id, name, description, price){
   document.getElementById('newServicePrice').value = price;
   document.getElementById('serviceSubmitBtn').textContent = 'Guardar cambios';
   document.getElementById('cancelServiceEdit').style.display = 'block';
+  document.getElementById('deleteServiceBtn').style.display = 'block';
   document.getElementById('newServiceName').scrollIntoView({ behavior:'smooth', block:'center' });
 }
 
@@ -584,6 +595,20 @@ function cancelEditService(){
   document.getElementById('newServicePrice').value='';
   document.getElementById('serviceSubmitBtn').textContent = '+ Agregar servicio';
   document.getElementById('cancelServiceEdit').style.display = 'none';
+  document.getElementById('deleteServiceBtn').style.display = 'none';
+}
+
+async function deleteServiceEditing(){
+  if(!editingServiceId) return;
+  if(!confirm('¿Eliminar este servicio? Esta acción no se puede deshacer.')) return;
+  try{
+    const r = await fetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json','x-admin-pin':adminPin||''},
+      body: JSON.stringify({ entity:'service', action:'delete', id: editingServiceId }) });
+    if(r.status===401){ adminPin=null; alert('PIN incorrecto'); return; }
+  }catch(e){ alert('No se pudo eliminar'); return; }
+  cancelEditService();
+  await loadConfig();
+  renderMgmt();
 }
 
 async function submitService(){
