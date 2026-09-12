@@ -213,7 +213,8 @@
     <div class="confirm-wrap" id="confirmWrap">
       <div class="okbadge"><div class="circ">✓</div><h2>Cita confirmada</h2></div>
       <div class="wa" id="waPreview"></div>
-      <div class="wa-note">Vista previa del recordatorio que llegaría al WhatsApp del cliente. (Este prototipo no envía mensajes reales — para eso se conecta la API de WhatsApp Business.)</div>
+      <div class="wa-note">Vista previa del recordatorio. Toca el botón verde para enviarlo ahora mismo por WhatsApp.</div>
+      <a class="cta" id="waSendBtn" href="#" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;background:#25D366;margin-top:14px;">Enviar por WhatsApp</a>
       <button class="cta ghost" onclick="resetBooking()">Agendar otra cita</button>
     </div>
 
@@ -246,7 +247,8 @@
         <input type="text" id="newServiceName" placeholder="Nombre del servicio">
         <input type="text" id="newServiceDesc" placeholder="Descripción corta (opcional)">
         <input type="text" id="newServicePrice" placeholder="Precio (ej. 25000)" inputmode="numeric">
-        <button class="cta ghost" style="margin-top:0;" onclick="addService()">+ Agregar servicio</button>
+        <button class="cta ghost" style="margin-top:0;" id="serviceSubmitBtn" onclick="submitService()">+ Agregar servicio</button>
+        <div id="cancelServiceEdit" onclick="cancelEditService()" style="display:none;text-align:center;margin-top:10px;font-size:11px;color:var(--muted);cursor:pointer;text-decoration:underline;">Cancelar edición</div>
       </div>
     </section>
   </div>
@@ -272,6 +274,12 @@ const SLOTS = ["09:00","09:45","10:30","11:15","12:00","12:45","13:30","14:15","
 const COMMISSION_RATE = 0.40;
 
 function money(n){ return "$" + Number(n).toLocaleString("es-CO"); }
+
+function toWhatsAppNumber(phone){
+  const digits = String(phone).replace(/\D/g,'');
+  if(digits.length === 10) return '57' + digits; // asume Colombia si vienen 10 digitos locales
+  return digits;
+}
 
 async function apiGet(params){
   const qs = new URLSearchParams(params).toString();
@@ -423,8 +431,12 @@ async function confirmBooking(){
     <div class="bubble">Hola <b>${name}</b>, tienes una reserva en <b>H Barber Shop</b> el ${d.label.toLowerCase()} ${d.num} a las ${state.time} con ${b.name}.<br>Servicio: ${s.name} · ${money(s.price)}<span class="t">Ahora</span></div>
     <div class="bubble out">Confirmo asistencia<span class="t">Ahora ✓✓</span></div>`;
 
-  // Best-effort: try the real WhatsApp send. If Meta credentials aren't configured yet
-  // (WHATSAPP_TOKEN / WHATSAPP_PHONE_ID), this silently no-ops and the preview above still shows.
+  const waMessage = `Hola ${name}, tienes una reserva en H Barber Shop el ${d.label.toLowerCase()} ${d.num} a las ${state.time} con ${b.name}. Servicio: ${s.name} - ${money(s.price)}. ¡Te esperamos!`;
+  document.getElementById('waSendBtn').href = `https://wa.me/${toWhatsAppNumber(phone)}?text=${encodeURIComponent(waMessage)}`;
+
+  // Best-effort: try the real WhatsApp Business API send too. If Meta credentials aren't
+  // configured yet (WHATSAPP_TOKEN / WHATSAPP_PHONE_ID), this silently no-ops; the manual
+  // "Enviar por WhatsApp" button above still works regardless.
   fetch('/api/send-whatsapp', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ to: phone, clientName: name, barberName: b.name, dateLabel: `${d.label} ${d.num}`, time: state.time, service: s.name })
@@ -504,7 +516,10 @@ async function renderMgmt(){
   document.getElementById('mgmtServices').innerHTML = (data.services||[]).map(s => `
     <div class="mgmt-row">
       <div class="info"><b>${s.name}</b><span>${money(s.price)}${s.description?(' · '+s.description):''} · ${s.active?'Visible':'Oculto'}</span></div>
-      <div class="mgmt-status ${s.active?'active':'inactive'}" onclick="toggleEntity('service','${s.id}')">${s.active?'Activo':'Inactivo'}</div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <div class="mgmt-status" style="background:#232327; color:#bbb;" onclick='startEditService(${JSON.stringify(s.id)}, ${JSON.stringify(s.name)}, ${JSON.stringify(s.description||"")}, ${s.price})'>Editar</div>
+        <div class="mgmt-status ${s.active?'active':'inactive'}" onclick="toggleEntity('service','${s.id}')">${s.active?'Activo':'Inactivo'}</div>
+      </div>
     </div>`).join('') || '<div class="empty">Sin servicios aún.</div>';
 }
 
@@ -531,19 +546,41 @@ async function addBarber(){
   renderMgmt();
 }
 
-async function addService(){
+let editingServiceId = null;
+
+function startEditService(id, name, description, price){
+  editingServiceId = id;
+  document.getElementById('newServiceName').value = name || '';
+  document.getElementById('newServiceDesc').value = description || '';
+  document.getElementById('newServicePrice').value = price;
+  document.getElementById('serviceSubmitBtn').textContent = 'Guardar cambios';
+  document.getElementById('cancelServiceEdit').style.display = 'block';
+  document.getElementById('newServiceName').scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
+function cancelEditService(){
+  editingServiceId = null;
+  document.getElementById('newServiceName').value='';
+  document.getElementById('newServiceDesc').value='';
+  document.getElementById('newServicePrice').value='';
+  document.getElementById('serviceSubmitBtn').textContent = '+ Agregar servicio';
+  document.getElementById('cancelServiceEdit').style.display = 'none';
+}
+
+async function submitService(){
   const name = document.getElementById('newServiceName').value.trim();
   const description = document.getElementById('newServiceDesc').value.trim();
   const price = parseInt(document.getElementById('newServicePrice').value, 10);
   if(!name || !price) return;
+  const body = editingServiceId
+    ? { entity:'service', action:'edit', id: editingServiceId, name, description, price }
+    : { entity:'service', action:'add', name, description, price };
   try{
     const r = await fetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json','x-admin-pin':adminPin||''},
-      body: JSON.stringify({ entity:'service', action:'add', name, description, price }) });
+      body: JSON.stringify(body) });
     if(r.status===401){ adminPin=null; alert('PIN incorrecto'); return; }
-  }catch(e){ alert('No se pudo agregar'); return; }
-  document.getElementById('newServiceName').value='';
-  document.getElementById('newServiceDesc').value='';
-  document.getElementById('newServicePrice').value='';
+  }catch(e){ alert('No se pudo guardar'); return; }
+  cancelEditService();
   await loadConfig();
   renderMgmt();
 }
