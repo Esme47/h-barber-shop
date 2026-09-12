@@ -63,6 +63,10 @@ module.exports = async (req, res) => {
         await sql`UPDATE services SET name = ${name}, description = ${description || ''}, price = ${price} WHERE id = ${id}`;
         return res.status(200).json({ ok: true });
       }
+      if (entity === 'service' && action === 'delete') {
+        await sql`DELETE FROM services WHERE id = ${id}`;
+        return res.status(200).json({ ok: true });
+      }
 
       return res.status(400).json({ error: 'Solicitud inválida' });
     }
