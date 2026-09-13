@@ -153,6 +153,12 @@
   .mgmt-add{ background:var(--surface); border:1px dashed var(--line); border-radius:13px; padding:12px; margin-bottom:20px; }
   .mgmt-add input{ margin-bottom:8px; }
   .mgmt-add input:last-of-type{ margin-bottom:10px; }
+
+  .wallet-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .wallet-card{ background:var(--surface); border:1px solid var(--line); border-radius:13px; padding:14px; }
+  .wallet-card span{ display:block; font-size:9px; color:var(--muted); letter-spacing:0.05em; text-transform:uppercase; margin-bottom:8px; }
+  .wallet-card b{ display:block; font-size:17px; color:var(--gold); font-family:'Cinzel',serif; }
+  .wallet-card small{ display:block; font-size:10px; color:var(--muted); margin-top:4px; }
 </style>
 <link rel="icon" href="/icon.png"><link rel="apple-touch-icon" href="/icon.png">
 <link rel="manifest" href="/manifest.json">
@@ -241,6 +247,22 @@
     </div>
 
     <section style="margin-top:26px;">
+      <div class="lbl">Cartera · protegido con PIN</div>
+      <div class="wallet-grid">
+        <div class="wallet-card">
+          <span>Hoy</span>
+          <b id="walletTodayAmount">$0</b>
+          <small id="walletTodayCount">0 servicios</small>
+        </div>
+        <div class="wallet-card">
+          <span>Este mes</span>
+          <b id="walletMonthAmount">$0</b>
+          <small id="walletMonthCount">0 servicios</small>
+        </div>
+      </div>
+    </section>
+
+    <section>
       <div class="lbl">Barberos · protegido con PIN</div>
       <div id="mgmtBarbers"></div>
       <div class="mgmt-add">
@@ -288,6 +310,15 @@ const SLOTS = ["09:00","09:45","10:30","11:15","12:00","12:45","13:30","14:15","
 const COMMISSION_RATE = 0.40;
 
 function money(n){ return "$" + Number(n).toLocaleString("es-CO"); }
+
+// Convierte una hora en formato 24h ("13:30") al formato natural de 12h ("1:30"),
+// sin sufijo am/pm (el contexto de horario del negocio ya lo deja claro).
+function fmtTime(t){
+  const parts = String(t).slice(0,5).split(':');
+  const hh = Number(parts[0]); const mm = parts[1];
+  const h12 = ((hh + 11) % 12) + 1;
+  return `${h12}:${mm}`;
+}
 
 function toWhatsAppNumber(phone){
   const digits = String(phone).replace(/\D/g,'');
@@ -393,7 +424,7 @@ async function renderSlots(){
   el.innerHTML = SLOTS.map(t => {
     const taken = appts.some(a => a.appt_time.slice(0,5)===t);
     const sel = state.time===t;
-    return `<div class="slotbtn ${sel?'sel':''} ${taken?'taken':''}" ${taken?'':`onclick="pickTime('${t}')"`}>${t}</div>`;
+    return `<div class="slotbtn ${sel?'sel':''} ${taken?'taken':''}" ${taken?'':`onclick="pickTime('${t}')"`}>${fmtTime(t)}</div>`;
   }).join('');
 }
 function pickTime(t){ state.time=t; renderSlots(); updateSummary(); }
@@ -412,7 +443,7 @@ function updateSummary(){
   box.innerHTML = `
     <div class="row"><span>Barbero</span><b>${b.name}</b></div>
     <div class="row"><span>Servicio</span><b>${s.name}</b></div>
-    <div class="row"><span>Fecha y hora</span><b>${d.label} ${d.num} · ${state.time}</b></div>
+    <div class="row"><span>Fecha y hora</span><b>${d.label} ${d.num} · ${fmtTime(state.time)}</b></div>
     <div class="row total"><span>Total</span><b>${money(s.price)}</b></div>`;
   btn.disabled = !(name && phone);
 }
@@ -448,11 +479,11 @@ async function confirmBooking(){
   document.getElementById('book-form').style.display='none';
   document.getElementById('confirmWrap').classList.add('on');
   document.getElementById('waPreview').innerHTML = `
-    <div class="bubble">Hola <b>${name}</b>, tienes una reserva en <b>H Barber Shop</b> el ${d.label.toLowerCase()} ${d.num} a las ${state.time} con ${b.name}.<br>Servicio: ${s.name} · ${money(s.price)}<span class="t">Ahora</span></div>
+    <div class="bubble">Hola <b>${name}</b>, tienes una reserva en <b>H Barber Shop</b> el ${d.label.toLowerCase()} ${d.num} a las ${fmtTime(state.time)} con ${b.name}.<br>Servicio: ${s.name} · ${money(s.price)}<span class="t">Ahora</span></div>
     <div class="bubble out">Confirmo asistencia<span class="t">Ahora ✓✓</span></div>`;
 
   // El boton verde ahora avisa al NUMERO FIJO DEL BARBERO sobre la nueva cita (no al cliente).
-  const waMessage = `Nueva cita: ${name} (${phone}) reservó ${s.name} el ${d.label.toLowerCase()} ${d.num} a las ${state.time} con ${b.name}. Total: ${money(s.price)}.`;
+  const waMessage = `Nueva cita: ${name} (${phone}) reservó ${s.name} el ${d.label.toLowerCase()} ${d.num} a las ${fmtTime(state.time)} con ${b.name}. Total: ${money(s.price)}.`;
   document.getElementById('waSendBtn').href = `https://wa.me/${BARBER_WHATSAPP}?text=${encodeURIComponent(waMessage)}`;
 
   // Best-effort: intenta tambien el envio real por la API de WhatsApp Business al CLIENTE.
@@ -500,7 +531,7 @@ async function renderAdmin(){
     list.innerHTML = appts.map(a => `
       <div class="appt">
         <div class="appt-top">
-          <div><div class="appt-time">${a.appt_time.slice(0,5)}</div><div class="appt-barber">${a.barber_name}</div></div>
+          <div><div class="appt-time">${fmtTime(a.appt_time)}</div><div class="appt-barber">${a.barber_name}</div></div>
           <div class="status ${a.status}">${a.status}</div>
         </div>
         <div class="appt-client">${a.client}</div>
@@ -520,12 +551,35 @@ async function renderAdmin(){
   document.getElementById('totComisiones').textContent = money(Math.round(ventas*COMMISSION_RATE));
 
   renderMgmt();
+  renderWallet();
+}
+
+// Cartera: totales de servicios PAGADOS de hoy (fecha real) y del mes calendario en curso,
+// respetando el filtro de barbero seleccionado arriba.
+async function renderWallet(){
+  let all = [];
+  try{ all = await apiGet({}); }
+  catch(e){
+    document.getElementById('walletTodayAmount').textContent = '$0';
+    document.getElementById('walletMonthAmount').textContent = '$0';
+    return;
+  }
+  const todayISO = nextDays(1)[0].iso;
+  const monthKey = todayISO.slice(0,7);
+  const filtered = all.filter(a => adminFilter==='todos' || a.barber_id===adminFilter);
+  const paidToday = filtered.filter(a => a.status==='pagada' && String(a.appt_date).slice(0,10)===todayISO);
+  const paidMonth = filtered.filter(a => a.status==='pagada' && String(a.appt_date).slice(0,10).startsWith(monthKey));
+  const sum = arr => arr.reduce((s,a)=>s+Number(a.price),0);
+  document.getElementById('walletTodayAmount').textContent = money(sum(paidToday));
+  document.getElementById('walletTodayCount').textContent = paidToday.length + (paidToday.length===1 ? ' servicio' : ' servicios');
+  document.getElementById('walletMonthAmount').textContent = money(sum(paidMonth));
+  document.getElementById('walletMonthCount').textContent = paidMonth.length + (paidMonth.length===1 ? ' servicio' : ' servicios');
 }
 
 function sendConfirmationToClient(id){
   const a = lastAppts.find(x => x.id === id);
   if(!a) return;
-  const msg = `Hola ${a.client}, tu cita en H Barber Shop quedó confirmada para el ${a.date_label || a.appt_date} a las ${a.appt_time.slice(0,5)} con ${a.barber_name}. Servicio: ${a.service} · ${money(a.price)}. ¡Te esperamos!`;
+  const msg = `Hola ${a.client}, tu cita en H Barber Shop quedó confirmada para el ${a.date_label || a.appt_date} a las ${fmtTime(a.appt_time)} con ${a.barber_name}. Servicio: ${a.service} · ${money(a.price)}. ¡Te esperamos!`;
   window.open(`https://wa.me/${toWhatsAppNumber(a.phone)}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
