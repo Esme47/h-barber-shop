@@ -159,6 +159,17 @@
   .wallet-card span{ display:block; font-size:9px; color:var(--muted); letter-spacing:0.05em; text-transform:uppercase; margin-bottom:8px; }
   .wallet-card b{ display:block; font-size:17px; color:var(--gold); font-family:'Cinzel',serif; }
   .wallet-card small{ display:block; font-size:10px; color:var(--muted); margin-top:4px; }
+
+  .client-row{ background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:12px 13px; margin-bottom:8px; }
+  .client-row .top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .client-row .top b{ display:block; font-size:12.5px; color:var(--silver); }
+  .client-row .top span{ display:block; font-size:10px; color:var(--muted); margin-top:2px; }
+  .client-badge{ display:inline-block; font-size:9.5px; font-weight:700; padding:3px 10px; border-radius:20px; margin-top:9px; }
+  .client-badge.overdue{ background:#3A1717; color:#E28080; }
+  .client-badge.soon{ background:#3A2E12; color:#E0AE4D; }
+  .client-badge.ok{ background:#173A24; color:#5FCF8A; }
+  .client-badge.muted{ background:#2A2A2A; color:var(--muted); }
+  .client-row .abtn{ margin-top:10px; flex:none; width:100%; }
 </style>
 <link rel="icon" href="/icon.png"><link rel="apple-touch-icon" href="/icon.png">
 <link rel="manifest" href="/manifest.json">
@@ -263,6 +274,16 @@
     </section>
 
     <section>
+      <div class="lbl">Clientes · protegido con PIN</div>
+      <div id="clientsList"><div class="empty">Cargando...</div></div>
+      <div class="mgmt-add">
+        <input type="text" id="newClientName" placeholder="Nombre del cliente" autocomplete="off">
+        <input type="tel" id="newClientPhone" placeholder="WhatsApp (ej. 300 000 0000)" autocomplete="off">
+        <button class="cta ghost" style="margin-top:0;" onclick="addClientManual()">+ Agregar cliente</button>
+      </div>
+    </section>
+
+    <section style="margin-top:26px;">
       <div class="lbl">Barberos · protegido con PIN</div>
       <div id="mgmtBarbers"></div>
       <div class="mgmt-add">
@@ -292,10 +313,12 @@
 <script>
 const API = "/api/appointments";
 const BARBER_WHATSAPP = "573018992551"; // numero fijo del barbero para avisos de nueva cita
+const RETOUCH_DAYS = 25; // ciclo sugerido entre cortes, para el aviso inteligente de clientes
 
 let BARBERS = [];
 let SERVICES = [];
 let lastAppts = [];
+let lastClients = [];
 
 async function loadConfig(){
   try{
@@ -552,6 +575,7 @@ async function renderAdmin(){
 
   renderMgmt();
   renderWallet();
+  renderClients();
 }
 
 // Cartera: totales de servicios PAGADOS de hoy (fecha real) y del mes calendario en curso,
@@ -581,6 +605,67 @@ function sendConfirmationToClient(id){
   if(!a) return;
   const msg = `Hola ${a.client}, tu cita en H Barber Shop quedó confirmada para el ${a.date_label || a.appt_date} a las ${fmtTime(a.appt_time)} con ${a.barber_name}. Servicio: ${a.service} · ${money(a.price)}. ¡Te esperamos!`;
   window.open(`https://wa.me/${toWhatsAppNumber(a.phone)}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+// ---------- CLIENTES ----------
+// Aviso inteligente: sugiere la proxima visita RETOUCH_DAYS despues de la ultima
+// cita marcada como "pagada". Si aun no tiene ninguna visita pagada, no hay fecha que sugerir.
+function nextCutInfo(lastVisit){
+  if(!lastVisit) return { label: 'Sin visitas registradas', cls: 'muted' };
+  const last = new Date(lastVisit);
+  const next = new Date(last);
+  next.setDate(next.getDate() + RETOUCH_DAYS);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diffDays = Math.round((next - today) / 86400000);
+  const nextStr = next.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
+  if (diffDays < 0) return { label: `Atrasado · debía volver el ${nextStr}`, cls: 'overdue' };
+  if (diffDays <= 5) return { label: `Pronto · ${nextStr}`, cls: 'soon' };
+  return { label: `Al día · próximo ${nextStr}`, cls: 'ok' };
+}
+
+async function renderClients(){
+  let clients = [];
+  try{
+    const r = await fetch('/api/clients', { headers: { 'x-admin-pin': adminPin||'' } });
+    if(r.status===401){ adminPin=null; document.getElementById('clientsList').innerHTML = '<div class="empty">PIN incorrecto</div>'; return; }
+    clients = await r.json();
+  }catch(e){ document.getElementById('clientsList').innerHTML = '<div class="empty">No se pudo cargar clientes</div>'; return; }
+  lastClients = clients;
+
+  const el = document.getElementById('clientsList');
+  if(clients.length===0){ el.innerHTML = '<div class="empty">Sin clientes aún.</div>'; return; }
+  el.innerHTML = clients.map(c => {
+    const info = nextCutInfo(c.last_visit);
+    return `
+    <div class="client-row">
+      <div class="top">
+        <div><b>${c.name}</b><span>${c.phone} · ${c.visits} visita${c.visits===1?'':'s'}</span></div>
+      </div>
+      <div class="client-badge ${info.cls}">${info.label}</div>
+      <div class="abtn wa" onclick="remindClient('${c.id}')">Recordar por WhatsApp</div>
+    </div>`;
+  }).join('');
+}
+
+function remindClient(id){
+  const c = lastClients.find(x => x.id === id);
+  if(!c) return;
+  const msg = `Hola ${c.name}, en H Barber Shop ya ha pasado un tiempo desde tu última visita. ¿Te gustaría agendar tu próximo corte? Escríbenos por aquí para reservar.`;
+  window.open(`https://wa.me/${toWhatsAppNumber(c.phone)}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+async function addClientManual(){
+  const name = document.getElementById('newClientName').value.trim();
+  const phone = document.getElementById('newClientPhone').value.trim();
+  if(!name || !phone) return;
+  try{
+    const r = await fetch('/api/clients', { method:'POST', headers:{'Content-Type':'application/json','x-admin-pin':adminPin||''},
+      body: JSON.stringify({ name, phone }) });
+    if(r.status===401){ adminPin=null; alert('PIN incorrecto'); return; }
+  }catch(e){ alert('No se pudo agregar el cliente'); return; }
+  document.getElementById('newClientName').value='';
+  document.getElementById('newClientPhone').value='';
+  renderClients();
 }
 
 async function renderMgmt(){
