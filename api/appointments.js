@@ -2,6 +2,11 @@ const { neon } = require('@neondatabase/serverless');
 const sql = neon(process.env.DATABASE_URL);
 const ADMIN_PIN = process.env.ADMIN_PIN;
 
+function slugify(s){
+  return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') || ('x'+Date.now());
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
@@ -27,6 +32,12 @@ module.exports = async (req, res) => {
       const id = 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
       await sql`INSERT INTO appointments (id, barber_id, barber_name, service, price, appt_date, date_label, appt_time, client, phone, status)
                 VALUES (${id}, ${b.barber_id}, ${b.barber_name}, ${b.service}, ${b.price}, ${b.date}, ${b.date_label}, ${b.time}, ${b.client}, ${b.phone}, 'pendiente')`;
+      // Registra/actualiza al cliente automaticamente en la seccion de Clientes.
+      if (b.client && b.phone) {
+        const clientId = slugify(b.phone);
+        await sql`INSERT INTO clients (id, name, phone) VALUES (${clientId}, ${b.client}, ${b.phone})
+                   ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name`;
+      }
       return res.status(200).json({ id });
     }
 
