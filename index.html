@@ -254,7 +254,7 @@
     <div id="adminList"><div class="empty">Cargando...</div></div>
     <div class="totals">
       <div>Ventas del día<b id="totVentas">$0</b></div>
-      <div>Comisiones (40%)<b id="totComisiones">$0</b></div>
+      <div>Comisiones (50%)<b id="totComisiones">$0</b></div>
     </div>
 
     <section style="margin-top:26px;">
@@ -330,7 +330,7 @@ async function loadConfig(){
 }
 
 const SLOTS = ["09:00","09:45","10:30","11:15","12:00","12:45","13:30","14:15","15:00","15:45","16:30","17:15","18:00"];
-const COMMISSION_RATE = 0.40;
+const COMMISSION_RATE = 0.50;
 
 function money(n){ return "$" + Number(n).toLocaleString("es-CO"); }
 
